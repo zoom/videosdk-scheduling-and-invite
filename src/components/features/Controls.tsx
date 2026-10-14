@@ -1,0 +1,138 @@
+import { useState } from 'react'
+import ZoomVideo from '@zoom/videosdk'
+import { Headphones, Loader, LogOut, Mic, MicOff, Video, VideoOff } from 'lucide-react'
+import { notifyError } from '../../lib/notify'
+
+type Client = ReturnType<typeof ZoomVideo.createClient>
+
+interface ControlsProps {
+  client: Client
+  isHost: boolean
+  leaveSession: (end: boolean) => void
+  onMediaChange: () => void
+}
+
+const controlClass =
+  'flex h-10 w-10 items-center justify-center rounded-full border border-transparent text-gray-700 transition-colors duration-200 hover:bg-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50'
+
+const Controls = ({ client, isHost, leaveSession, onMediaChange }: ControlsProps) => {
+  const [isVideoOn, setIsVideoOn] = useState(false)
+  const [videoLoading, setVideoLoading] = useState(false)
+  const [isAudioStarted, setIsAudioStarted] = useState(false)
+  const [isMuted, setIsMuted] = useState(false)
+  const [audioLoading, setAudioLoading] = useState(false)
+  const [showLeaveMenu, setShowLeaveMenu] = useState(false)
+
+  const toggleVideo = async () => {
+    const stream = client.getMediaStream()
+    setVideoLoading(true)
+    try {
+      if (client.getCurrentUserInfo().bVideoOn) await stream.stopVideo()
+      else await stream.startVideo({})
+      setIsVideoOn(client.getCurrentUserInfo().bVideoOn)
+      onMediaChange()
+    } catch (error) {
+      notifyError(error)
+    } finally {
+      setVideoLoading(false)
+    }
+  }
+
+  const toggleAudio = async () => {
+    const stream = client.getMediaStream()
+    setAudioLoading(true)
+    try {
+      if (!client.getCurrentUserInfo().audio) {
+        await stream.startAudio({})
+      } else if (client.getCurrentUserInfo().muted) {
+        await stream.unmuteAudio()
+      } else {
+        await stream.muteAudio()
+      }
+      const current = client.getCurrentUserInfo()
+      setIsAudioStarted(Boolean(current.audio))
+      setIsMuted(current.muted ?? false)
+      onMediaChange()
+    } catch (error) {
+      notifyError(error)
+    } finally {
+      setAudioLoading(false)
+    }
+  }
+
+  const leave = (end: boolean) => {
+    setShowLeaveMenu(false)
+    leaveSession(end)
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        className={controlClass}
+        title={!isAudioStarted ? 'Join audio' : isMuted ? 'Unmute' : 'Mute'}
+        onClick={toggleAudio}
+        disabled={audioLoading}
+      >
+        {audioLoading ? (
+          <Loader size={20} className="animate-spin" />
+        ) : !isAudioStarted ? (
+          <Headphones size={20} />
+        ) : isMuted ? (
+          <MicOff size={20} />
+        ) : (
+          <Mic size={20} />
+        )}
+      </button>
+      <button
+        type="button"
+        className={controlClass}
+        title={isVideoOn ? 'Stop video' : 'Start video'}
+        onClick={toggleVideo}
+        disabled={videoLoading}
+      >
+        {videoLoading ? (
+          <Loader size={20} className="animate-spin" />
+        ) : isVideoOn ? (
+          <Video size={20} />
+        ) : (
+          <VideoOff size={20} />
+        )}
+      </button>
+
+      <div className="relative">
+        {showLeaveMenu && (
+          <>
+            <div className="fixed inset-0 z-10" onClick={() => setShowLeaveMenu(false)} />
+            <div className="absolute bottom-full left-1/2 z-20 mb-2 w-[200px] -translate-x-1/2 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl">
+              <button
+                type="button"
+                className="w-full bg-red-500 px-4 py-2 text-left text-white transition-colors duration-200 hover:bg-red-600"
+                onClick={() => leave(true)}
+              >
+                End Session
+              </button>
+              <button
+                type="button"
+                className="w-full px-4 py-2 text-left text-red-500 transition-colors duration-200 hover:bg-gray-100"
+                onClick={() => leave(false)}
+              >
+                Leave Session
+              </button>
+            </div>
+          </>
+        )}
+        <button
+          type="button"
+          aria-label="Leave"
+          className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-red-500 shadow-md transition-all duration-200 hover:bg-red-600 hover:shadow-lg active:bg-red-800 active:shadow-inner"
+          onClick={() => (isHost ? setShowLeaveMenu((open) => !open) : leave(false))}
+        >
+          <LogOut size={24} className="text-white" />
+        </button>
+      </div>
+    </>
+  )
+}
+
+export default Controls

@@ -1,0 +1,7 @@
+@import "tailwindcss";
+@import "toastify-js/src/toastify.css";
+@import "react-day-picker/style.css";
+
+#root {
+  margin: 0 auto;
+}
