@@ -8,6 +8,7 @@ import {
   getSession,
 } from './zoom'
 import { addSession, readSessions, removeSessions, type StoredSession } from './store'
+import { requireAuth } from './auth'
 
 export const router = Router()
 
@@ -46,7 +47,7 @@ router.post(['/token', '/generateToken'], (req, res) => {
   res.json({ token: generateSignature(sessionName, role) })
 })
 
-router.post(['/create-session', '/createsession'], async (req, res) => {
+router.post(['/create-session', '/createsession'], requireAuth, async (req, res) => {
   const body = req.body ?? {}
   const sessionName = validateSessionName(body.sessionName)
   const role = validateRole(body.role)
@@ -90,13 +91,14 @@ router.post(['/create-session', '/createsession'], async (req, res) => {
     hold,
     createdAt: new Date().toISOString(),
   }
-  await addSession(record)
+  await addSession(req.user!.id, record)
 
   res.status(201).json({ ...record, role, token: generateSignature(sessionName, role) })
 })
 
-router.get('/scheduled-sessions', async (_req, res) => {
-  const stored = await readSessions()
+router.get('/scheduled-sessions', requireAuth, async (req, res) => {
+  const userId = req.user!.id
+  const stored = await readSessions(userId)
   const results = await Promise.all(
     stored.map(async (record) => {
       try {
@@ -108,7 +110,7 @@ router.get('/scheduled-sessions', async (_req, res) => {
     }),
   )
   // Sessions Zoom no longer knows about were deleted or expired, so drop them.
-  await removeSessions(results.filter((r) => r.zoom === null).map((r) => r.record.sessionId))
+  await removeSessions(userId, results.filter((r) => r.zoom === null).map((r) => r.record.sessionId))
   const sessions = results
     .filter((r) => r.zoom !== null)
     .map((r) => ({ ...r.record, zoom: r.zoom }))
@@ -116,13 +118,15 @@ router.get('/scheduled-sessions', async (_req, res) => {
   res.json({ sessions })
 })
 
-router.delete('/scheduled-sessions/:sessionId', async (req, res) => {
+router.delete('/scheduled-sessions/:sessionId', requireAuth, async (req, res) => {
   const sessionId = String(req.params.sessionId)
+  const owned = (await readSessions(req.user!.id)).some((s) => s.sessionId === sessionId)
+  if (!owned) throw new HttpError(404, 'Session not found')
   try {
     await deleteSession(sessionId)
   } catch (error) {
     if (!(error instanceof ZoomApiError && error.status === 404)) throw error
   }
-  await removeSessions([sessionId])
+  await removeSessions(req.user!.id, [sessionId])
   res.status(204).end()
 })

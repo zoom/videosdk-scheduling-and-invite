@@ -6,6 +6,8 @@ import cors from 'cors'
 import express, { type ErrorRequestHandler } from 'express'
 import { createServer as createViteServer } from 'vite'
 import { router } from './routes'
+import { authRouter } from './auth'
+import { ensureSchema } from './db'
 import { ZoomApiError } from './zoom'
 
 const isProd = process.env.NODE_ENV === 'production'
@@ -16,6 +18,8 @@ if (!process.env.ZOOM_VSDK_KEY || !process.env.ZOOM_VSDK_SECRET) {
   console.warn('Warning: ZOOM_VSDK_KEY and/or ZOOM_VSDK_SECRET are not set in .env')
 }
 
+await ensureSchema()
+
 const endpointUrl: string = process.env.ENDPOINT_URL?.trim() || `http://localhost:${process.env.PORT || 3000}`
 
 const app = express()
@@ -23,6 +27,7 @@ const httpServer = http.createServer(app)
 
 app.use(cors())
 app.use(express.json())
+app.use('/auth', authRouter)
 app.use(router)
 
 const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
