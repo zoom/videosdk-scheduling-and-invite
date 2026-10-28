@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { DayPicker } from 'react-day-picker'
-import { apiFetch, buildSessionLink, getConfig, type ScheduledSession } from '../lib/api'
+import { apiFetch, buildGuestLink, buildHostLink, getConfig, type ScheduledSession } from '../lib/api'
 import { notifyError, notifySuccess } from '../lib/notify'
 import {
   TIME_SLOTS,
@@ -84,8 +84,8 @@ const ScheduleTab = () => {
       })
 
       const { endpointUrl } = await getConfig()
-      const hostLink = buildSessionLink(endpointUrl, session.sessionName, 1, session.password)
-      const guestLink = buildSessionLink(endpointUrl, session.sessionName, 0, session.password)
+      const hostLink = buildHostLink(endpointUrl, session.inviteId)
+      const guestLink = buildGuestLink(endpointUrl, session.inviteId)
       const lines = [
         `Hi! You're invited to this Zoom Session: ${session.sessionName}`,
         '',
@@ -93,6 +93,7 @@ const ScheduleTab = () => {
         `Time: ${formatTime(session.startTime, session.timezone)} (${duration} minutes)`,
         `Timezone: ${session.timezone}`,
       ]
+      if (session.password) lines.push(`Password: ${session.password}`)
       if (session.agenda) lines.push('', 'Meeting Agenda:', session.agenda)
       lines.push('', `Please join using this link: ${guestLink}`)
       setResult({ hostLink, invite: lines.join('\n') })

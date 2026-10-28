@@ -8,7 +8,8 @@ const App = () => (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<HomePage />} />
-        <Route path="/session" element={<SessionPage />} />
+        <Route path="/s/:inviteId" element={<SessionPage />} />
+        <Route path="/s/:inviteId/host" element={<SessionPage host />} />
       </Routes>
     </BrowserRouter>
   </AuthProvider>

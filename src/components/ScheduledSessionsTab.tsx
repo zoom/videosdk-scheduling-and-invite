@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { FiTrash2 } from 'react-icons/fi'
-import { apiFetch, buildSessionLink, getConfig, type ScheduledSession } from '../lib/api'
+import { apiFetch, buildHostLink, getConfig, type ScheduledSession } from '../lib/api'
 import { notifyError, notifySuccess } from '../lib/notify'
 import { formatDate, formatTime } from '../lib/time'
 import Spinner from './Spinner'
@@ -40,7 +40,7 @@ const ScheduledSessionsTab = () => {
   const handleJoin = async (session: ScheduledSession) => {
     try {
       const { endpointUrl } = await getConfig()
-      window.open(buildSessionLink(endpointUrl, session.sessionName, 1, session.password), '_blank', 'noopener')
+      window.open(buildHostLink(endpointUrl, session.inviteId), '_blank', 'noopener')
     } catch (error) {
       notifyError(error)
     }

@@ -19,6 +19,7 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
 
 export interface ScheduledSession {
   sessionId: string
+  inviteId: string
   sessionName: string
   password: string
   agenda: string
@@ -39,13 +40,8 @@ export function getConfig() {
   return configPromise
 }
 
-export function buildSessionLink(
-  endpointUrl: string,
-  sessionName: string,
-  role: 0 | 1,
-  password: string,
-): string {
-  const params = new URLSearchParams({ sessionName, role: String(role) })
-  if (password) params.set('password', password)
-  return `${endpointUrl}/session?${params.toString()}`
-}
+export const buildGuestLink = (endpointUrl: string, inviteId: string) =>
+  `${endpointUrl}/s/${encodeURIComponent(inviteId)}`
+
+export const buildHostLink = (endpointUrl: string, inviteId: string) =>
+  `${buildGuestLink(endpointUrl, inviteId)}/host`

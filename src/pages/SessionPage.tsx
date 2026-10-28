@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import ZoomVideo from '@zoom/videosdk'
 import Video from '../components/features/Video'
 import Controls from '../components/features/Controls'
 import Spinner from '../components/Spinner'
 import { apiFetch } from '../lib/api'
+import { useAuth } from '../lib/auth'
+import AuthPage from './AuthPage'
 import { notifyError } from '../lib/notify'
 
 interface ConnectionPayload {
@@ -12,12 +14,18 @@ interface ConnectionPayload {
   reason?: string
 }
 
-const SessionPage = () => {
+interface TokenResponse {
+  token: string
+  sessionName: string
+  password?: string
+  passwordRequired?: boolean
+}
+
+const SessionPage = ({ host = false }: { host?: boolean }) => {
   const navigate = useNavigate()
-  const [params] = useSearchParams()
-  const sessionName = params.get('sessionName') ?? ''
-  const role = params.get('role') === '1' ? 1 : 0
-  const password = params.get('password') ?? ''
+  const { user, loading: authLoading } = useAuth()
+  const { inviteId = '' } = useParams()
+  const role = host ? 1 : 0
 
   const clientRef = useRef<ReturnType<typeof ZoomVideo.createClient>>(null)
   clientRef.current ??= ZoomVideo.createClient()
@@ -27,15 +35,46 @@ const SessionPage = () => {
   const [failed, setFailed] = useState(false)
   const [inSession, setInSession] = useState(false)
   const [mediaVersion, setMediaVersion] = useState(0)
+  const [prep, setPrep] = useState<TokenResponse | null>(null)
+  const [enteredPassword, setEnteredPassword] = useState<string | null>(null)
+  const [passwordDraft, setPasswordDraft] = useState('')
   const joinedRef = useRef(false)
+  const initializedRef = useRef(false)
+
+  const isHost = host
+  const sessionName = prep?.sessionName ?? ''
+  const needsAuth = isHost && !user
+  const needsPassword = !isHost && prep?.passwordRequired === true && enteredPassword === null
+  const joinPassword = isHost ? prep?.password : (enteredPassword ?? '')
+  const ready = prep !== null && joinPassword !== undefined && !needsPassword
+
+  // Request a signature. Host tokens are only issued to the signed-in owner of the session.
+  const userEmail = user?.userEmail
+  useEffect(() => {
+    if (authLoading || (isHost && !userEmail)) return
+
+    let cancelled = false
+    apiFetch<TokenResponse>('/token', {
+      method: 'POST',
+      body: JSON.stringify({ inviteId, role }),
+    })
+      .then((data) => {
+        if (!cancelled) setPrep(data)
+      })
+      .catch((error) => {
+        notifyError(error)
+        if (!cancelled) {
+          setFailed(true)
+          setLoading(false)
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [inviteId, role, isHost, authLoading, userEmail])
 
   useEffect(() => {
-    if (!sessionName) {
-      notifyError(new Error('Missing sessionName in the link'))
-      setFailed(true)
-      setLoading(false)
-      return
-    }
+    if (!ready || !prep) return
 
     let cancelled = false
 
@@ -46,19 +85,19 @@ const SessionPage = () => {
     }
 
     const join = async () => {
+      setLoading(true)
       try {
-        const { token } = await apiFetch<{ token: string }>('/token', {
-          method: 'POST',
-          body: JSON.stringify({ sessionName, role }),
-        })
-        await client.init('en-US', 'Global', {
-          patchJsMedia: true,
-          stayAwake: true,
-          leaveOnPageUnload: true,
-        })
+        if (!initializedRef.current) {
+          await client.init('en-US', 'Global', {
+            patchJsMedia: true,
+            stayAwake: true,
+            leaveOnPageUnload: true,
+          })
+          initializedRef.current = true
+        }
         client.on('connection-change', onConnectionChange)
-        const userName = `${role === 1 ? 'Host' : 'Guest'}-${Math.floor(Math.random() * 900 + 100)}`
-        await client.join(sessionName, token, userName, password)
+        const userName = `${isHost ? 'Host' : 'Guest'}-${Math.floor(Math.random() * 900 + 100)}`
+        await client.join(sessionName, prep.token, userName, joinPassword ?? '')
         joinedRef.current = true
         if (!cancelled) {
           setInSession(true)
@@ -66,9 +105,14 @@ const SessionPage = () => {
         }
       } catch (error) {
         notifyError(error)
-        if (!cancelled) {
+        if (cancelled) return
+        setLoading(false)
+        // Let guests retry when the entered password was rejected.
+        if (!isHost && prep.passwordRequired) {
+          setPasswordDraft('')
+          setEnteredPassword(null)
+        } else {
           setFailed(true)
-          setLoading(false)
         }
       }
     }
@@ -82,7 +126,7 @@ const SessionPage = () => {
         client.leave().catch(notifyError)
       }
     }
-  }, [client, navigate, sessionName, role, password])
+  }, [client, navigate, sessionName, isHost, prep, ready, joinPassword])
 
   const leaveSession = async (end: boolean) => {
     if (joinedRef.current) {
@@ -94,6 +138,41 @@ const SessionPage = () => {
       }
     }
     navigate('/')
+  }
+
+  if (needsAuth) return authLoading ? <Spinner size={96} /> : <AuthPage />
+
+  if (needsPassword) {
+    return (
+      <div className="flex h-dvh items-center justify-center bg-gray-100 px-4">
+        <form
+          className="w-full max-w-sm space-y-4 rounded-xl bg-white p-6 shadow"
+          onSubmit={(event) => {
+            event.preventDefault()
+            setEnteredPassword(passwordDraft)
+          }}
+        >
+          <h1 className="text-xl font-semibold">Session password</h1>
+          <p className="truncate text-sm text-gray-600">Enter the password to join {sessionName}.</p>
+          <input
+            type="password"
+            autoFocus
+            required
+            autoComplete="off"
+            aria-label="Session password"
+            value={passwordDraft}
+            onChange={(event) => setPasswordDraft(event.target.value)}
+            className="w-full rounded-md border border-gray-300 px-3 py-2"
+          />
+          <button
+            type="submit"
+            className="w-full cursor-pointer rounded-lg bg-sky-500 px-4 py-2 text-white hover:bg-sky-600"
+          >
+            Join
+          </button>
+        </form>
+      </div>
+    )
   }
 
   if (failed) {

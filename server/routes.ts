@@ -7,8 +7,14 @@ import {
   generateSignature,
   getSession,
 } from './zoom'
-import { addSession, readSessions, removeSessions, type StoredSession } from './store'
-import { requireAuth } from './auth'
+import {
+  addSession,
+  findInvite,
+  readSessions,
+  removeSessions,
+  type StoredSession,
+} from './store'
+import { requireAuth, userFromRequest } from './auth'
 
 export const router = Router()
 
@@ -41,10 +47,28 @@ router.get('/config', (_req, res) => {
   res.json({ endpointUrl })
 })
 
-router.post(['/token', '/generateToken'], (req, res) => {
-  const sessionName = validateSessionName(req.body?.sessionName)
+router.post(['/token', '/generateToken'], async (req, res) => {
+  const inviteId = req.body?.inviteId
+  if (typeof inviteId !== 'string' || inviteId.length === 0 || inviteId.length > 128) {
+    throw new HttpError(404, 'Invite not found')
+  }
   const role = validateRole(req.body?.role)
-  res.json({ token: generateSignature(sessionName, role) })
+  const invite = await findInvite(inviteId)
+  if (!invite) throw new HttpError(404, 'Invite not found')
+  const token = generateSignature(invite.sessionName, role)
+
+  if (role === 1) {
+    // Hosts must be signed in as the account (matched by email) that owns the session.
+    const user = await userFromRequest(req)
+    if (!user) throw new HttpError(401, 'Sign in to join as host')
+    if (user.user_email.toLowerCase() !== invite.ownerEmail.toLowerCase()) {
+      throw new HttpError(403, 'This host link does not belong to your account')
+    }
+    res.json({ token, sessionName: invite.sessionName, password: invite.password })
+    return
+  }
+
+  res.json({ token, sessionName: invite.sessionName, passwordRequired: invite.password !== '' })
 })
 
 router.post(['/create-session', '/createsession'], requireAuth, async (req, res) => {
@@ -81,6 +105,7 @@ router.post(['/create-session', '/createsession'], requireAuth, async (req, res)
 
   const record: StoredSession = {
     sessionId: created.session_id,
+    inviteId: randomBytes(16).toString('base64url'),
     sessionName,
     password,
     agenda: typeof body.agenda === 'string' ? body.agenda : '',

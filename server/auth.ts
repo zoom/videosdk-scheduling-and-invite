@@ -71,7 +71,7 @@ async function startSession(res: Response, userId: string) {
   setSessionCookie(res, token, SESSION_MS)
 }
 
-async function userFromRequest(req: Request): Promise<AuthUser | undefined> {
+export async function userFromRequest(req: Request): Promise<AuthUser | undefined> {
   const token = readCookie(req, COOKIE)
   if (!token) return undefined
   const rows = await query<AuthUser>(
