@@ -19,7 +19,7 @@ function getCredentials() {
   return { key, secret }
 }
 
-export function generateSignature(sessionName: string, role: number, expiresInHours = 2): string {
+export function generateSignature(sessionName: string, role: number, hold = 0, expiresInHours = 2): string {
   const { key, secret } = getCredentials()
   const iat = Math.round(Date.now() / 1000) - 30
   const exp = iat + 60 * 60 * expiresInHours
@@ -28,6 +28,7 @@ export function generateSignature(sessionName: string, role: number, expiresInHo
     app_key: key,
     tpc: sessionName,
     role_type: role,
+    hold,
     version: 1,
     iat,
     exp,

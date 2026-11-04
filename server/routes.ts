@@ -55,7 +55,7 @@ router.post(['/token', '/generateToken'], async (req, res) => {
   const role = validateRole(req.body?.role)
   const invite = await findInvite(inviteId)
   if (!invite) throw new HttpError(404, 'Invite not found')
-  const token = generateSignature(invite.sessionName, role)
+  const token = generateSignature(invite.sessionName, role, invite.hold)
 
   if (role === 1) {
     // Hosts must be signed in as the account (matched by email) that owns the session.
@@ -118,7 +118,7 @@ router.post(['/create-session', '/createsession'], requireAuth, async (req, res)
   }
   await addSession(req.user!.id, record)
 
-  res.status(201).json({ ...record, role, token: generateSignature(sessionName, role) })
+  res.status(201).json({ ...record, role, token: generateSignature(sessionName, role, hold) })
 })
 
 router.get('/scheduled-sessions', requireAuth, async (req, res) => {

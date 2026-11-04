@@ -102,11 +102,11 @@ const VideoTile = ({ client, user, isActive, aspect, quality, refreshKey }: Tile
 const Video = ({ client, version, children }: VideoProps) => {
   const mainRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ width: 0, height: 0 })
-  const [users, setUsers] = useState<Participant[]>(() => client.getAllUser())
+  const [users, setUsers] = useState<Participant[]>(() => client.getAllUser().filter((u) => !u.isOnHold))
   const [activeId, setActiveId] = useState<number>()
 
   useEffect(() => {
-    const refresh = () => setUsers([...client.getAllUser()])
+    const refresh = () => setUsers(client.getAllUser().filter((u) => !u.isOnHold))
     const onActiveSpeaker = (payload: { userId: number }[]) => setActiveId(payload[0]?.userId)
     const events = ['user-added', 'user-removed', 'user-updated', 'peer-video-state-change']
     events.forEach((e) => client.on(e, refresh))

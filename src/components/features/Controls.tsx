@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import ZoomVideo from '@zoom/videosdk'
-import { Headphones, Loader, LogOut, Mic, MicOff, Video, VideoOff } from 'lucide-react'
+import { Headphones, Loader, LogOut, MoreHorizontal, Mic, MicOff, Video, VideoOff } from 'lucide-react'
+import { AdmitParticipantsModal, ParticipantsModal } from './HostPanels'
 import { notifyError } from '../../lib/notify'
 
 type Client = ReturnType<typeof ZoomVideo.createClient>
@@ -22,6 +23,8 @@ const Controls = ({ client, isHost, leaveSession, onMediaChange }: ControlsProps
   const [isMuted, setIsMuted] = useState(false)
   const [audioLoading, setAudioLoading] = useState(false)
   const [showLeaveMenu, setShowLeaveMenu] = useState(false)
+  const [showMore, setShowMore] = useState(false)
+  const [panel, setPanel] = useState<'participants' | 'admit' | null>(null)
 
   const toggleVideo = async () => {
     const stream = client.getMediaStream()
@@ -99,6 +102,42 @@ const Controls = ({ client, isHost, leaveSession, onMediaChange }: ControlsProps
           <VideoOff size={20} />
         )}
       </button>
+
+      {isHost && (
+        <div className="relative">
+          {showMore && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setShowMore(false)} />
+              <div className="absolute bottom-full left-1/2 z-20 mb-2 w-[200px] -translate-x-1/2 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl">
+                {([['participants', 'Participants'], ['admit', 'Admit Participants']] as const).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    className="w-full px-4 py-2 text-left transition-colors duration-200 hover:bg-gray-100"
+                    onClick={() => {
+                      setShowMore(false)
+                      setPanel(key)
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+          <button
+            type="button"
+            aria-label="More"
+            title="More"
+            className={controlClass}
+            onClick={() => setShowMore((open) => !open)}
+          >
+            <MoreHorizontal size={20} />
+          </button>
+        </div>
+      )}
+      {panel === 'participants' && <ParticipantsModal client={client} onClose={() => setPanel(null)} />}
+      {panel === 'admit' && <AdmitParticipantsModal client={client} onClose={() => setPanel(null)} />}
 
       <div className="relative">
         {showLeaveMenu && (

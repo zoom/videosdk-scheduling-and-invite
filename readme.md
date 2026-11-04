@@ -58,7 +58,7 @@ The [Zoom Video SDK for Web](https://developers.zoom.us/docs/video-sdk/web/) ena
 
 ## Usage
 
-1. Navigate to http://localhost:3000 and create an account, or sign in.
+1. Navigate to the endpoint_url or and create an account, or sign in.
 
 2. On the **Schedule and Invite** tab, enter a session name, date, time, timezone, duration and an optional agenda and password. Choose whether to enable the waiting room (hold) and cloud recording, then click to schedule.
 

@@ -4,6 +4,7 @@ import ZoomVideo from '@zoom/videosdk'
 import Video from '../components/features/Video'
 import Controls from '../components/features/Controls'
 import Spinner from '../components/Spinner'
+import WaitingRoom from '../components/features/WaitingRoom'
 import { apiFetch } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import AuthPage from './AuthPage'
@@ -34,6 +35,7 @@ const SessionPage = ({ host = false }: { host?: boolean }) => {
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
   const [inSession, setInSession] = useState(false)
+  const [onHold, setOnHold] = useState(false)
   const [mediaVersion, setMediaVersion] = useState(0)
   const [prep, setPrep] = useState<TokenResponse | null>(null)
   const [enteredPassword, setEnteredPassword] = useState<string | null>(null)
@@ -78,8 +80,14 @@ const SessionPage = ({ host = false }: { host?: boolean }) => {
 
     let cancelled = false
 
+    const onHoldChange = (payload: { isOnHold: boolean }) => {
+      if (cancelled) return
+      setOnHold(payload.isOnHold)
+      if (payload.isOnHold) setLoading(false)
+    }
+
     const onConnectionChange = (payload: ConnectionPayload) => {
-      if (payload.state === 'Reconnecting') setLoading(true)
+      if (payload.state === 'Reconnecting') setLoading(payload.reason !== 'on hold')
       else if (payload.state === 'Connected') setLoading(false)
       else if (payload.state === 'Closed' || payload.state === 'Fail') navigate('/')
     }
@@ -96,10 +104,12 @@ const SessionPage = ({ host = false }: { host?: boolean }) => {
           initializedRef.current = true
         }
         client.on('connection-change', onConnectionChange)
+        client.on('on-hold-change', onHoldChange)
         const userName = `${isHost ? 'Host' : 'Guest'}-${Math.floor(Math.random() * 900 + 100)}`
         await client.join(sessionName, prep.token, userName, joinPassword ?? '')
         joinedRef.current = true
         if (!cancelled) {
+          setOnHold(client.isUserOnHold())
           setInSession(true)
           setLoading(false)
         }
@@ -121,6 +131,8 @@ const SessionPage = ({ host = false }: { host?: boolean }) => {
     return () => {
       cancelled = true
       client.off('connection-change', onConnectionChange)
+      client.off('on-hold-change', onHoldChange)
+      setOnHold(false)
       if (joinedRef.current) {
         joinedRef.current = false
         client.leave().catch(notifyError)
@@ -191,7 +203,8 @@ const SessionPage = ({ host = false }: { host?: boolean }) => {
           <Spinner size={96} />
         </div>
       )}
-      {inSession && (
+      {inSession && onHold && <WaitingRoom />}
+      {inSession && !onHold && (
         <>
           <h1 className="w-full truncate px-2 py-3 text-center text-xl font-semibold">{sessionName}</h1>
           <Video client={client} version={mediaVersion}>

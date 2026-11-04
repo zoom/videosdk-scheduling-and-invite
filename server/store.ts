@@ -66,17 +66,18 @@ export interface InviteRecord {
   sessionName: string
   password: string
   ownerEmail: string
+  hold: number
 }
 
 export async function findInvite(inviteId: string): Promise<InviteRecord | undefined> {
-  const rows = await query<{ meeting_name: string; meeting_password: string; user_email: string }>(
-    `SELECT m.meeting_name, m.meeting_password, u.user_email FROM meetings m
+  const rows = await query<{ meeting_name: string; meeting_password: string; hold: number; user_email: string }>(
+    `SELECT m.meeting_name, m.meeting_password, m.hold, u.user_email FROM meetings m
      JOIN users u ON u.id = m.user_id
      WHERE m.invite_id = $1`,
     [inviteId],
   )
   const r = rows[0]
-  return r && { sessionName: r.meeting_name, password: r.meeting_password, ownerEmail: r.user_email }
+  return r && { sessionName: r.meeting_name, password: r.meeting_password, ownerEmail: r.user_email, hold: r.hold }
 }
 
 export async function getUserDocument(user: { id: string; user_name: string; user_email: string }) {
