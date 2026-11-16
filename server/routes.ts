@@ -31,6 +31,17 @@ function validateSessionName(value: unknown): string {
   if (value.length > 200) {
     throw new HttpError(400, 'sessionName is too long (max 200 characters)')
   }
+  if (!/^[\x20-\x7E]+$/.test(value)) {
+    throw new HttpError(400, 'sessionName must contain only printable characters')
+  }
+  return value
+}
+
+function validateAgenda(value: unknown): string {
+  if (value === undefined) return ''
+  if (typeof value !== 'string' || !/^[\x20-\x7E]*$/.test(value)) {
+    throw new HttpError(400, 'agenda must contain only printable characters')
+  }
   return value
 }
 
@@ -74,6 +85,7 @@ router.post(['/token', '/generateToken'], async (req, res) => {
 router.post(['/create-session', '/createsession'], requireAuth, async (req, res) => {
   const body = req.body ?? {}
   const sessionName = validateSessionName(body.sessionName)
+  const agenda = validateAgenda(body.agenda)
   const role = validateRole(body.role)
   const hold = body.hold
   if (hold !== 0 && hold !== 1 && hold !== 2) {
@@ -90,11 +102,11 @@ router.post(['/create-session', '/createsession'], requireAuth, async (req, res)
   // sessionPassword=true means "protect with a password"; the value comes from `password` or is generated.
   let password = ''
   if (body.sessionPassword) {
-    password = typeof body.password === 'string' && body.password.trim() !== ''
-      ? body.password.trim()
+    password = typeof body.password === 'string' && body.password !== ''
+      ? body.password
       : randomBytes(5).toString('hex')
-    if (!/^[A-Za-z0-9]{1,10}$/.test(password)) {
-      throw new HttpError(400, 'password must be alphanumeric and at most 10 characters')
+    if (!/^[\x20-\x7E]{1,10}$/.test(password)) {
+      throw new HttpError(400, 'password must contain only printable characters and be at most 10 characters')
     }
   }
 
@@ -108,7 +120,7 @@ router.post(['/create-session', '/createsession'], requireAuth, async (req, res)
     inviteId: randomBytes(16).toString('base64url'),
     sessionName,
     password,
-    agenda: typeof body.agenda === 'string' ? body.agenda : '',
+    agenda,
     startTime: startTime.toISOString(),
     timezone: typeof body.timezone === 'string' ? body.timezone : 'UTC',
     duration: Number(body.duration) || 30,

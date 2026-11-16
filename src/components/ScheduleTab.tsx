@@ -126,7 +126,9 @@ const ScheduleTab = () => {
             className={inputClass}
             value={sessionName}
             maxLength={200}
-            onChange={(e) => setSessionName(e.target.value)}
+            pattern="[ -~]+"
+            title="Printable characters only"
+            onChange={(e) => setSessionName(e.target.value.replace(/[^\x20-\x7E]/g, ''))}
           />
         </div>
 
@@ -137,9 +139,9 @@ const ScheduleTab = () => {
             className={inputClass}
             value={password}
             maxLength={10}
-            pattern="[A-Za-z0-9]*"
-            title="Letters and numbers only (max 10 characters)"
-            onChange={(e) => setPassword(e.target.value)}
+            pattern="[ -~]*"
+            title="Printable characters only (max 10 characters)"
+            onChange={(e) => setPassword(e.target.value.replace(/[^\x20-\x7E]/g, ''))}
           />
         </div>
 
@@ -150,7 +152,7 @@ const ScheduleTab = () => {
             className={inputClass}
             rows={3}
             value={agenda}
-            onChange={(e) => setAgenda(e.target.value)}
+            onChange={(e) => setAgenda(e.target.value.replace(/[^\x20-\x7E]/g, ''))}
           />
         </div>
 
