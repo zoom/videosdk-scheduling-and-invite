@@ -47,6 +47,7 @@ export async function ensureSchema(): Promise<void> {
     )`)
   await query('CREATE INDEX IF NOT EXISTS meetings_user_idx ON meetings (user_id)')
   await query('ALTER TABLE meetings ADD COLUMN IF NOT EXISTS invite_id TEXT')
+  await query('ALTER TABLE meetings ADD COLUMN IF NOT EXISTS zoom_session_name TEXT')
   // Meetings created before invite IDs existed get a random ID too.
   await query(`UPDATE meetings
     SET invite_id = replace(gen_random_uuid()::text, '-', '') || replace(gen_random_uuid()::text, '-', '')

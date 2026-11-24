@@ -66,8 +66,6 @@ router.post(['/token', '/generateToken'], async (req, res) => {
   const role = validateRole(req.body?.role)
   const invite = await findInvite(inviteId)
   if (!invite) throw new HttpError(404, 'Invite not found')
-  const token = generateSignature(invite.sessionName, role, invite.hold)
-
   if (role === 1) {
     // Hosts must be signed in as the account (matched by email) that owns the session.
     const user = await userFromRequest(req)
@@ -75,16 +73,19 @@ router.post(['/token', '/generateToken'], async (req, res) => {
     if (user.user_email.toLowerCase() !== invite.ownerEmail.toLowerCase()) {
       throw new HttpError(403, 'This host link does not belong to your account')
     }
+    const token = generateSignature(invite.zoomSessionName, role, invite.hold)
     res.json({ token, sessionName: invite.sessionName, password: invite.password })
     return
   }
 
+  const token = generateSignature(invite.zoomSessionName, role, invite.hold)
   res.json({ token, sessionName: invite.sessionName, passwordRequired: invite.password !== '' })
 })
 
 router.post(['/create-session', '/createsession'], requireAuth, async (req, res) => {
   const body = req.body ?? {}
   const sessionName = validateSessionName(body.sessionName)
+  const zoomSessionName = randomBytes(32).toString('hex')
   const agenda = validateAgenda(body.agenda)
   const role = validateRole(body.role)
   const hold = body.hold
@@ -110,7 +111,7 @@ router.post(['/create-session', '/createsession'], requireAuth, async (req, res)
     }
   }
 
-  const created = await createVideoSession(sessionName, password, {
+  const created = await createVideoSession(zoomSessionName, password, {
     auto_recording: body.auto_recording ? 'cloud' : 'none',
     hold,
   })
@@ -119,6 +120,7 @@ router.post(['/create-session', '/createsession'], requireAuth, async (req, res)
     sessionId: created.session_id,
     inviteId: randomBytes(16).toString('base64url'),
     sessionName,
+    zoomSessionName,
     password,
     agenda,
     startTime: startTime.toISOString(),
@@ -130,7 +132,8 @@ router.post(['/create-session', '/createsession'], requireAuth, async (req, res)
   }
   await addSession(req.user!.id, record)
 
-  res.status(201).json({ ...record, role, token: generateSignature(sessionName, role, hold) })
+  const { zoomSessionName: _zoomSessionName, ...publicRecord } = record
+  res.status(201).json({ ...publicRecord, role, token: generateSignature(zoomSessionName, role, hold) })
 })
 
 router.get('/scheduled-sessions', requireAuth, async (req, res) => {
@@ -150,7 +153,7 @@ router.get('/scheduled-sessions', requireAuth, async (req, res) => {
   await removeSessions(userId, results.filter((r) => r.zoom === null).map((r) => r.record.sessionId))
   const sessions = results
     .filter((r) => r.zoom !== null)
-    .map((r) => ({ ...r.record, zoom: r.zoom }))
+    .map(({ record: { zoomSessionName: _zoomSessionName, ...record }, zoom }) => ({ ...record, zoom }))
     .sort((a, b) => a.startTime.localeCompare(b.startTime))
   res.json({ sessions })
 })

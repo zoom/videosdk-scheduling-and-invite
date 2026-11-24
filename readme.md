@@ -7,10 +7,11 @@ The [Zoom Video SDK for Web](https://developers.zoom.us/docs/video-sdk/web/) ena
 - **Guest link** (`/s/<inviteId>`): uses a random, unguessable invite ID. It does not contain the session name, role or password. Guests are prompted for the password if the session has one.
 - **Host link** (`/s/<inviteId>/host`): requires the host to be signed in, and only works for the account that created the session.
 - Video SDK signatures are generated on the server, so your SDK secret is never exposed to the browser.
+- New sessions use a random server-generated Zoom topic, separate from the displayed session name. The topic is visible in the join token and is not a secret.
 
 ## Prerequisites
 
-- [Node.js](https://nodejs.org/) 20 or later, and npm. 
+- [Node.js](https://nodejs.org/) 24.7 or later, and npm.
 - A [Zoom Video SDK account](https://developers.zoom.us/docs/video-sdk/get-credentials/) with:
   - Video SDK Credentials: **SDK Key** and **SDK Secret**
   - REST API Credentials: **API Key** and **API Secret** (used by the server to create and delete sessions through the REST API)
@@ -78,6 +79,10 @@ You can deploy this app to Render using the button below:
 | Render |
 |:-:|
 | [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/zoom/videosdk-scheduling-and-invite-sample.git)
+
+When creating the Blueprint, provide the Zoom credentials, `DATABASE_URL`, and `ENDPOINT_URL` (the public HTTPS URL of the Render service, or your custom domain). Render supplies `PORT`. The build installs development dependencies for TypeScript and Vite, builds the app, and starts it in production mode.
+
+Existing sessions retain their original Zoom topics so their invite links continue to work. Any legacy topics already duplicated before this change can still collide; delete and reschedule those sessions.
 
 
 ## Need help?

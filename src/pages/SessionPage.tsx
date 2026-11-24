@@ -22,6 +22,16 @@ interface TokenResponse {
   passwordRequired?: boolean
 }
 
+function getTokenTopic(token: string): string {
+  const payload = token.split('.')[1]
+  if (!payload) throw new Error('Invalid session token')
+  const decoded: unknown = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')))
+  if (!decoded || typeof decoded !== 'object' || !('tpc' in decoded) || typeof decoded.tpc !== 'string' || !decoded.tpc) {
+    throw new Error('Invalid session token')
+  }
+  return decoded.tpc
+}
+
 const SessionPage = ({ host = false }: { host?: boolean }) => {
   const navigate = useNavigate()
   const { user, loading: authLoading } = useAuth()
@@ -106,7 +116,7 @@ const SessionPage = ({ host = false }: { host?: boolean }) => {
         client.on('connection-change', onConnectionChange)
         client.on('on-hold-change', onHoldChange)
         const userName = `${isHost ? 'Host' : 'Guest'}-${Math.floor(Math.random() * 900 + 100)}`
-        await client.join(sessionName, prep.token, userName, joinPassword ?? '')
+        await client.join(getTokenTopic(prep.token), prep.token, userName, joinPassword ?? '')
         joinedRef.current = true
         if (!cancelled) {
           setOnHold(client.isUserOnHold())
